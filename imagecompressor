@@ -1,0 +1,101 @@
+from PIL import Image
+from math import *
+from numpy import *
+from scipy import fftpack
+
+# Definitioner för beräkning av DCT-matrisen i 2 dimensioner, samt dess invers på tillbakavägen
+def dct2 (block):
+  return fftpack.dct(fftpack.dct(block.T, norm = 'ortho').T, norm = 'ortho')
+
+def idct2(block):
+    return fftpack.idct(fftpack.idct(block.T, norm = 'ortho').T, norm = 'ortho')
+
+# kvantiseringsmatrisen (ändra gärna)
+Q = array([[16,  11,  10,  16,  24,  40,  51,  61],
+  [12,  12,  14,  19,  26,  58,  60,  55],
+  [14,  13,  16,  24,  40,  57,  69,  56],
+  [14,  17,  22,  29,  51,  87,  80,  62],
+  [18,  22,  37,  56,  68, 109, 103,  77],
+  [24,  35,  55,  64,  81, 104, 113,  92],
+  [49,  64,  78,  87, 103, 121, 120, 101],
+  [72,  92,  95,  98, 112, 100, 103,  99]])
+
+imag = Image.open("moon.jpg")
+imag = imag.convert ('RGB') # konverterar bilden till RGB
+
+
+#skapar en lista b för alla pixlars ljushet
+b = []
+for y in range(2400):
+  l = []
+  for x in range(2400):
+    pixelRGB = imag.getpixel((x,y))
+    R,G,B = pixelRGB 
+    pixelljushet = sum([R,G,B])/3
+    l.append(pixelljushet)
+  b.append(l)
+
+matris = array(b) - 128
+
+def blockshaped(arr):
+    h, w = arr.shape
+    return (arr.reshape(h//8, 8, -1,8)
+               .swapaxes(1,2)
+               .reshape(-1, 8, 8))
+
+def blockshaped(arr, nrows, ncols):
+    """
+    (stulen heheh)
+    Return an array of shape (n, nrows, ncols) where
+    n * nrows * ncols = arr.size
+
+    If arr is a 2D array, the returned array looks like n subblocks with
+    each subblock preserving the "physical" layout of arr.
+    """
+    h, w = arr.shape
+    return (arr.reshape(h//nrows, nrows, -1, ncols)
+               .swapaxes(1,2)
+               .reshape(-1, nrows, ncols))
+
+
+def unblockshaped(arr, h, w):
+    """
+    (stulen också...)
+    Return an array of shape (h, w) where
+    h * w = arr.size
+
+    If arr is of shape (n, nrows, ncols), n sublocks of shape (nrows, ncols),
+    then the returned array preserves the "physical" layout of the sublocks.
+    """
+    n, nrows, ncols = arr.shape
+    return (arr.reshape(h//nrows, -1, nrows, ncols)
+               .swapaxes(1,2)
+               .reshape(h, w))
+    
+# en loop
+
+GG = blockshaped(matris, 8, 8)
+
+index = 0
+for ruta in GG:
+  matrisBack = idct2(around(dct2(ruta)/Q)*Q)+128
+  GG[index]=matrisBack
+  index += 1
+
+nybild = unblockshaped(GG,2400,2400)
+
+
+  
+
+#ritar upp den nya bilden
+w = 2400
+h = 2400
+
+img = Image.fromarray(nybild)
+if img.mode != 'RGB':
+    img = img.convert('RGB')
+
+img.save('craxy.jpg')
+img.show()
+
+
